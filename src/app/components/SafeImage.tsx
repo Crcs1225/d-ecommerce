@@ -7,6 +7,7 @@ import Image, { ImageProps } from "next/image";
 interface SafeImageProps extends Omit<ImageProps, "src"> {
   src: string;
   fallbackSrc: string;
+  alt: string;
 }
 
 export default function SafeImage({ src, fallbackSrc, alt, ...rest }: SafeImageProps) {

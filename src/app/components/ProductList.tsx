@@ -7,10 +7,12 @@ import { searchProducts } from "../lib/api";
 
 
 
-interface Product {
+export interface Product {
   id: string;
   name: string;
   price: number;
+  rating: number;
+  description?: string;
   image: string;
 }
 
@@ -38,7 +40,7 @@ export default function ProductList({ query }: { query: string }) {
         {products.map((p) => (
           <div
             key={p.id}
-            className="bg-white p-4 rounded-xl shadow hover:shadow-lg transition"
+            className="bg-white p-4 rounded-xl shadow hover:shadow-lg transition flex flex-col justify-between"
           >
             <SafeImage
             src={p.image}
@@ -49,9 +51,22 @@ export default function ProductList({ query }: { query: string }) {
             fallbackSrc="/fallback-img-product.png"
             />
 
+            <div className="flex justify-between items-start gap-4">
+              {/* Left: Name + Description */}
+              <div className="flex-1">
+                <h3 className="font-semibold text-lg">{p.name}</h3>
+                <p className="text-sm text-gray-600 line-clamp-2">
+                  {p.description || "No description available."}
+                </p>
+              </div>
 
-            <h3 className="font-semibold">{p.name}</h3>
-            <p className="text-green-600 font-bold">${p.price}</p>
+              {/* Right: Price + Rating */}
+              <div className="text-right whitespace-nowrap">
+                <p className="text-green-600 font-bold">${p.price}</p>
+                <p className="text-yellow-500 text-sm">⭐ {p.rating} / 5</p>
+              </div>
+            </div>
+            
           </div>
         ))}
       </div>
