@@ -48,7 +48,8 @@ export interface Conversation {
 }
 
 // api-client.ts
-const API_URL = process.env.NEXT_PUBLIC_CHATBOT_API_URL || "http://localhost:8000";
+// FIX: Use HTTP instead of HTTPS and correct port 7860
+const API_URL = process.env.NEXT_PUBLIC_CHATBOT_API_URL || "http://localhost:7860";
 
 class ApiError extends Error {
   constructor(public status: number, message: string) {
@@ -58,106 +59,109 @@ class ApiError extends Error {
 }
 
 class ChatbotApiClient {
-  private async fetchWithTimeout(url: string, options: RequestInit, timeout = 10000) {
+  private async fetchWithTimeout(url: string, options: RequestInit, timeout = 15000) {
     const controller = new AbortController();
     const id = setTimeout(() => controller.abort(), timeout);
     
     try {
+      console.log(`Making request to: ${url}`);
       const response = await fetch(url, {
         ...options,
         signal: controller.signal,
+        headers: {
+          'Content-Type': 'application/json',
+          ...options.headers,
+        },
       });
       clearTimeout(id);
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        throw new ApiError(response.status, `HTTP error! status: ${response.status}, message: ${errorText}`);
+      }
+      
       return response;
     } catch (error) {
       clearTimeout(id);
+      if (error instanceof Error && error.name === 'AbortError') {
+        throw new ApiError(408, 'Request timeout');
+      }
       throw error;
     }
   }
 
   private async handleResponse<T>(response: Response): Promise<T> {
-    if (!response.ok) {
-      throw new ApiError(response.status, `API error: ${response.statusText}`);
+    const text = await response.text();
+    if (!text) {
+      throw new ApiError(response.status, 'Empty response from server');
     }
-    return response.json();
+    
+    try {
+      return JSON.parse(text);
+    } catch (e) {
+      console.error('Invalid JSON response:', e);
+      throw new ApiError(response.status, `Invalid JSON response: ${text.substring(0, 100)}`);
+    }
   }
 
   async sendMessage(request: ChatRequest): Promise<ChatResponse> {
     const response = await this.fetchWithTimeout(`${API_URL}/chat`, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
       body: JSON.stringify(request),
     });
-
     return this.handleResponse<ChatResponse>(response);
   }
 
   async getProducts(category?: string): Promise<Product[]> {
-    const url = category ? `${API_URL}/products?category=${category}` : `${API_URL}/products`;
+    const params = new URLSearchParams();
+    if (category) params.append('category', category);
+    params.append('limit', '20');
     
-    const response = await this.fetchWithTimeout(url, {
-      method: "GET",
-    });
-
+    const url = `${API_URL}/products?${params.toString()}`;
+    const response = await this.fetchWithTimeout(url, { method: "GET" });
     return this.handleResponse<Product[]>(response);
   }
 
   async getProduct(productId: string): Promise<Product> {
-    const response = await this.fetchWithTimeout(`${API_URL}/products/${productId}`, {
-      method: "GET",
-    });
-
+    const response = await this.fetchWithTimeout(`${API_URL}/products/${productId}`, { method: "GET" });
     return this.handleResponse<Product>(response);
   }
 
   async searchProducts(request: SearchRequest): Promise<Product[]> {
     const response = await this.fetchWithTimeout(`${API_URL}/search`, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
       body: JSON.stringify(request),
     });
-
     return this.handleResponse<Product[]>(response);
   }
 
   async getAvailableIntents(): Promise<{ intents: string[] }> {
-    const response = await this.fetchWithTimeout(`${API_URL}/intents`, {
-      method: "GET",
-    });
-
+    const response = await this.fetchWithTimeout(`${API_URL}/intents`, { method: "GET" });
     return this.handleResponse<{ intents: string[] }>(response);
   }
 
   async getConversations(userId: string): Promise<Conversation[]> {
-    const response = await this.fetchWithTimeout(`${API_URL}/conversations/${userId}`, {
-      method: "GET",
-    });
-
+    const response = await this.fetchWithTimeout(`${API_URL}/conversations/${userId}`, { method: "GET" });
     return this.handleResponse<Conversation[]>(response);
   }
 
   async healthCheck(): Promise<{ message: string; status: string }> {
-    const response = await this.fetchWithTimeout(`${API_URL}/`, {
-      method: "GET",
-    });
-
+    // Use the root endpoint for health check since it returns the expected format
+    const response = await this.fetchWithTimeout(`${API_URL}/`, { method: "GET" });
     return this.handleResponse<{ message: string; status: string }>(response);
   }
 
   async createProduct(product: Omit<Product, 'id'>): Promise<{ message: string; product_id: string }> {
     const response = await this.fetchWithTimeout(`${API_URL}/products`, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
       body: JSON.stringify(product),
     });
-
     return this.handleResponse<{ message: string; product_id: string }>(response);
+  }
+
+  async getCategories(): Promise<{ categories: string[] }> {
+    const response = await this.fetchWithTimeout(`${API_URL}/categories`, { method: "GET" });
+    return this.handleResponse<{ categories: string[] }>(response);
   }
 }
 
@@ -180,7 +184,7 @@ export const chatService = {
     });
   },
 
-  async getProductRecommendations(category: string): Promise<Product[]> {
+  async getProductRecommendations(category?: string): Promise<Product[]> {
     return chatbotApi.getProducts(category);
   },
 
@@ -218,8 +222,19 @@ export const chatService = {
     try {
       await chatbotApi.healthCheck();
       return true;
-    } catch {
+    } catch (error) {
+      console.error('Health check failed:', error);
       return false;
+    }
+  },
+
+  async getCategories(): Promise<string[]> {
+    try {
+      const response = await chatbotApi.getCategories();
+      return response.categories;
+    } catch (error) {
+      console.error('Failed to fetch categories:', error);
+      return ['electronics', 'clothing', 'home', 'beauty', 'sports', 'books'];
     }
   },
 };
@@ -231,10 +246,11 @@ export const useChatbotApi = () => {
   const [apiStatus, setApiStatus] = useState<'online' | 'offline' | 'checking'>('checking');
 
   const checkHealth = useCallback(async (): Promise<boolean> => {
+    setApiStatus('checking');
     try {
-      await chatbotApi.healthCheck();
-      setApiStatus('online');
-      return true;
+      const isHealthy = await chatService.checkApiHealth();
+      setApiStatus(isHealthy ? 'online' : 'offline');
+      return isHealthy;
     } catch {
       setApiStatus('offline');
       return false;
@@ -243,6 +259,10 @@ export const useChatbotApi = () => {
 
   useEffect(() => {
     checkHealth();
+    
+    // Check health every 30 seconds
+    const interval = setInterval(checkHealth, 30000);
+    return () => clearInterval(interval);
   }, [checkHealth]);
 
   const sendMessage = async (
@@ -254,7 +274,7 @@ export const useChatbotApi = () => {
   };
 
   const getProducts = async (category?: string): Promise<Product[]> => {
-    return chatService.getProductRecommendations(category || '');
+    return chatService.getProductRecommendations(category);
   };
 
   const searchProducts = async (query: string, category?: string): Promise<Product[]> => {
@@ -269,12 +289,17 @@ export const useChatbotApi = () => {
     return chatbotApi.createProduct(product);
   };
 
+  const getCategories = async (): Promise<string[]> => {
+    return chatService.getCategories();
+  };
+
   return {
     sendMessage,
     getProducts,
     searchProducts,
     getConversations,
     createProduct,
+    getCategories,
     checkHealth,
     apiStatus,
   };
@@ -290,12 +315,21 @@ export const handleApiError = (error: unknown): string => {
         return "The requested resource was not found.";
       case 500:
         return "Server error. Please try again later.";
+      case 408:
+        return "Request timeout. Please check your connection.";
       default:
         return `Error: ${error.message}`;
     }
   }
   
   if (error instanceof Error) {
+    // Handle network errors
+    if (error.message.includes('Failed to fetch') || error.message.includes('NetworkError')) {
+      return "Network error. Please check your internet connection and ensure the server is running.";
+    }
+    if (error.message.includes('SSL')) {
+      return "Connection error. Please ensure you're using the correct protocol (HTTP vs HTTPS).";
+    }
     return error.message;
   }
   
@@ -328,7 +362,8 @@ export const conversationStorage = {
   clearConversation(conversationId: string): void {
     if (typeof window === 'undefined') return;
     localStorage.removeItem(`conversation_${conversationId}`);
-    if (this.getCurrentConversationId() === conversationId) {
+    const currentId = this.getCurrentConversationId();
+    if (currentId === conversationId) {
       localStorage.removeItem('current_conversation_id');
     }
   },
