@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useRef, useEffect, JSX } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { 
   chatService, 
@@ -57,6 +57,68 @@ const buttonVariants = {
 const iconVariants = {
   open: { rotate: 45 },
   closed: { rotate: 0 }
+};
+
+// Helper function to format message text with proper lists
+const formatMessageText = (text: string) => {
+  // Split the text by lines
+  const lines = text.split('\n');
+  const formattedLines: JSX.Element[] = [];
+  
+  let inList = false;
+  let listItems: JSX.Element[] = [];
+
+  lines.forEach((line, index) => {
+    // Check if this line is a list item (starts with * or -)
+    const isListItem = /^[*•-]\s+.+/.test(line.trim());
+    
+    if (isListItem) {
+      if (!inList) {
+        inList = true;
+      }
+      // Remove the asterisk/dash and trim
+      const listItemText = line.trim().replace(/^[*•-]\s+/, '');
+      listItems.push(
+        <li key={index} className="ml-4 mb-1">
+          {listItemText}
+        </li>
+      );
+    } else {
+      // If we were in a list and now we're not, push the list
+      if (inList && listItems.length > 0) {
+        formattedLines.push(
+          <ul key={`list-${index}`} className="ml-4 my-2 list-disc space-y-1">
+            {listItems}
+          </ul>
+        );
+        listItems = [];
+        inList = false;
+      }
+      
+      // Add regular text line
+      if (line.trim()) {
+        formattedLines.push(
+          <p key={index} className="mb-2">
+            {line}
+          </p>
+        );
+      } else if (index > 0 && index < lines.length - 1) {
+        // Add empty line for spacing between paragraphs
+        formattedLines.push(<br key={`br-${index}`} />);
+      }
+    }
+  });
+
+  // If we ended while still in a list, push the remaining list items
+  if (inList && listItems.length > 0) {
+    formattedLines.push(
+      <ul key={`list-end`} className="ml-4 my-2 list-disc space-y-1">
+        {listItems}
+      </ul>
+    );
+  }
+
+  return formattedLines.length > 0 ? formattedLines : text;
 };
 
 export default function Chatbot() {
@@ -177,7 +239,7 @@ export default function Chatbot() {
   const handleProductRecommendations = async (products: Product[]) => {
     if (products.length === 0) return;
 
-    // Create a product summary message
+    // Create a product summary message with proper formatting
     const productSummary = products.map(product => 
       `• ${product.name} - $${product.price} (${product.in_stock ? 'In Stock' : 'Out of Stock'})`
     ).join('\n');
@@ -324,7 +386,13 @@ export default function Chatbot() {
                         : "bg-white text-gray-800 border border-gray-200 rounded-bl-none shadow-sm"
                     }`}
                   >
-                    <p className="text-sm">{message.text}</p>
+                    {message.sender === "bot" ? (
+                      <div className="text-sm">
+                        {formatMessageText(message.text)}
+                      </div>
+                    ) : (
+                      <p className="text-sm">{message.text}</p>
+                    )}
                     <p className={`text-xs mt-1 ${message.sender === "user" ? "text-green-100" : "text-gray-400"}`}>
                       {message.timestamp || new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                     </p>
@@ -445,7 +513,7 @@ export default function Chatbot() {
         >
           {open ? (
             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18-6M6 6l12 12" />
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
             </svg>
           ) : (
             <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">

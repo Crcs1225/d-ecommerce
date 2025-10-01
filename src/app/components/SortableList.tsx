@@ -159,21 +159,7 @@ export default function SortableProducts() {
 
       {/* Sort buttons and product count */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 mb-6">
-        <div className="flex gap-2">
-          {["rating", "price"].map((option) => (
-            <button
-              key={option}
-              onClick={() => setSortBy(option as "rating" | "price")}
-              className={`px-4 py-2 rounded-full border transition-all duration-200 ${
-                sortBy === option
-                  ? "bg-blue-600 text-white border-blue-600 shadow-md"
-                  : "bg-gray-100 text-gray-700 border-gray-300 hover:bg-gray-200"
-              }`}
-            >
-              {option === "rating" ? "⭐ Sort by Rating" : "💰 Sort by Price"}
-            </button>
-          ))}
-        </div>
+        
 
         <div className="text-sm text-gray-600">
           Showing {sortedProducts.length} product{sortedProducts.length !== 1 ? 's' : ''}
