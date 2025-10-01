@@ -7,6 +7,7 @@ import ProductList from "./components/ProductList";
 import Recommendation from "./components/Recommendation";
 import AboutSection from "./components/About";
 import ContactSection from "./components/Contact";
+import SortableList from "./components/SortableList";
 
 export default function HomePage() {
   const [query, setQuery] = useState("");
@@ -20,6 +21,7 @@ export default function HomePage() {
       {query && <ProductList query={query} />}
       {/* Recommendation System */}
       <Recommendation />
+      <SortableList />
       {/* About and Contact */}
       <AboutSection />
       <ContactSection />
