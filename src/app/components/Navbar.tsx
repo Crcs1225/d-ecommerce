@@ -2,15 +2,17 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 
 export default function Navbar() {
   // Simulated auth state (replace with real auth context or props)
   const [user, setUser] = useState<{ firstname: string } | null>(null);
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
+  const router = useRouter();
 
   const handleGetStarted = () => {
-    // Add your get started logic here
-    console.log("Get Started clicked");
+    // Navigate to auth page
+    router.push("/auth");
   };
 
   const toggleMobileMenu = () => {
@@ -22,14 +24,16 @@ export default function Navbar() {
   };
 
   return (
-    <nav className="bg-white sticky top-0 z-50 shadow-sm border-b border-gray-100">
+    <nav className="bg-white sticky top-0 z-40 shadow-sm border-b border-gray-100">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="flex justify-between items-center h-16">
           {/* Logo - Left */}
           <div className="flex-shrink-0">
-            <div className="text-2xl font-bold bg-gradient-to-r from-green-400 to-green-600 bg-clip-text text-transparent">
-              Daddy&apos;s Shop
-            </div>
+            <Link href="/">
+              <div className="text-2xl font-bold bg-gradient-to-r from-green-400 to-green-600 bg-clip-text text-transparent">
+                Daddy&apos;s Shop
+              </div>
+            </Link>
           </div>
 
           {/* Navigation Links - Centered - Hidden on mobile */}
